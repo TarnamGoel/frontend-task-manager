@@ -1,0 +1,152 @@
+<main class="shell">
+  <section *ngIf="!user()" class="auth">
+    <div>
+      <p class="eyebrow">Team Task Manager</p>
+      <h1>Plan projects, assign work, and track delivery.</h1>
+    </div>
+
+    <form class="panel auth-panel" (ngSubmit)="submitAuth()">
+      <div class="segmented">
+        <button type="button" [class.active]="authMode() === 'login'" (click)="authMode.set('login')">Login</button>
+        <button type="button" [class.active]="authMode() === 'signup'" (click)="authMode.set('signup')">Signup</button>
+      </div>
+      <label *ngIf="authMode() === 'signup'">
+        Name
+        <input name="name" [(ngModel)]="authForm.name" required>
+      </label>
+      <label>
+        Email
+        <input type="email" name="email" [(ngModel)]="authForm.email" required>
+      </label>
+      <label>
+        Password
+        <input type="password" name="password" [(ngModel)]="authForm.password" required minlength="6">
+      </label>
+      <p class="error" *ngIf="message()">{{ message() }}</p>
+      <button class="primary" type="submit">{{ authMode() === 'login' ? 'Login' : 'Create account' }}</button>
+    </form>
+  </section>
+
+  <section *ngIf="user()" class="workspace">
+    <header class="topbar">
+      <div>
+        <p class="eyebrow">Workspace</p>
+        <h1>Team Task Manager</h1>
+      </div>
+      <div class="profile">
+        <span>{{ user()?.name }}</span>
+        <button type="button" (click)="logout()">Logout</button>
+      </div>
+    </header>
+
+    <section class="metrics" *ngIf="dashboard() as summary">
+      <div>
+        <span>Total tasks</span>
+        <strong>{{ summary.totalTasks }}</strong>
+      </div>
+      <div>
+        <span>To Do</span>
+        <strong>{{ summary.tasksByStatus.TODO || 0 }}</strong>
+      </div>
+      <div>
+        <span>In Progress</span>
+        <strong>{{ summary.tasksByStatus.IN_PROGRESS || 0 }}</strong>
+      </div>
+      <div>
+        <span>Overdue</span>
+        <strong>{{ summary.overdueTasks }}</strong>
+      </div>
+    </section>
+
+    <div class="layout">
+      <aside class="sidebar">
+        <form class="panel" (ngSubmit)="createProject()">
+          <h2>Create project</h2>
+          <input name="projectName" placeholder="Project name" [(ngModel)]="projectForm.name" required>
+          <textarea name="projectDescription" placeholder="Description" [(ngModel)]="projectForm.description"></textarea>
+          <button class="primary" type="submit">Create</button>
+        </form>
+
+        <nav class="project-list">
+          <button
+            type="button"
+            *ngFor="let project of projects()"
+            [class.active]="project.id === selectedProjectId()"
+            (click)="selectProject(project.id)">
+            <strong>{{ project.name }}</strong>
+            <small>{{ project.members.length }} members</small>
+          </button>
+        </nav>
+      </aside>
+
+      <section class="content" *ngIf="selectedProject() as project">
+        <div class="section-head">
+          <div>
+            <p class="eyebrow">{{ isAdmin() ? 'Admin access' : 'Member access' }}</p>
+            <h2>{{ project.name }}</h2>
+            <p>{{ project.description }}</p>
+          </div>
+        </div>
+
+        <section class="panel members">
+          <div class="section-head compact">
+            <h3>Members</h3>
+            <form *ngIf="isAdmin()" class="inline-form" (ngSubmit)="addMember()">
+              <select name="member" [(ngModel)]="memberForm.userId" required>
+                <option value="">Add member</option>
+                <option *ngFor="let candidate of users()" [value]="candidate.id">{{ candidate.name }} · {{ candidate.email }}</option>
+              </select>
+              <button type="submit">Add</button>
+            </form>
+          </div>
+          <div class="chips">
+            <span *ngFor="let member of project.members">
+              {{ member.name }}
+              <button *ngIf="isAdmin() && member.id !== project.adminId" type="button" (click)="removeMember(member.id)">x</button>
+            </span>
+          </div>
+        </section>
+
+        <form *ngIf="isAdmin()" class="panel task-form" (ngSubmit)="createTask()">
+          <h3>Create task</h3>
+          <input name="taskTitle" placeholder="Title" [(ngModel)]="taskForm.title" required>
+          <textarea name="taskDescription" placeholder="Description" [(ngModel)]="taskForm.description"></textarea>
+          <input type="date" name="dueDate" [(ngModel)]="taskForm.dueDate" required>
+          <select name="priority" [(ngModel)]="taskForm.priority">
+            <option *ngFor="let priority of priorities" [value]="priority">{{ priority }}</option>
+          </select>
+          <select name="assignee" [(ngModel)]="taskForm.assigneeId">
+            <option value="">Unassigned</option>
+            <option *ngFor="let member of project.members" [value]="member.id">{{ member.name }}</option>
+          </select>
+          <button class="primary" type="submit">Create task</button>
+        </form>
+
+        <section class="board">
+          <div class="column" *ngFor="let status of statuses">
+            <h3>{{ statusLabel(status) }}</h3>
+            <article class="task-card" *ngFor="let task of tasks() | slice:0:100" [hidden]="task.status !== status">
+              <div class="task-head">
+                <strong>{{ task.title }}</strong>
+                <span [class]="'priority ' + task.priority.toLowerCase()">{{ task.priority }}</span>
+              </div>
+              <p>{{ task.description }}</p>
+              <small>Due {{ task.dueDate }} · {{ task.assignee?.name || 'Unassigned' }}</small>
+              <div class="actions">
+                <select [ngModel]="task.status" [ngModelOptions]="{standalone: true}" (ngModelChange)="updateStatus(task, $event)">
+                  <option *ngFor="let option of statuses" [value]="option">{{ statusLabel(option) }}</option>
+                </select>
+                <button *ngIf="isAdmin()" type="button" (click)="deleteTask(task.id)">Delete</button>
+              </div>
+            </article>
+          </div>
+        </section>
+      </section>
+
+      <section class="empty" *ngIf="projects().length === 0">
+        <h2>Create your first project</h2>
+        <p>Project creators become admins and can invite members immediately.</p>
+      </section>
+    </div>
+  </section>
+</main>
